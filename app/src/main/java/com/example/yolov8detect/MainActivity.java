@@ -371,7 +371,6 @@ public class MainActivity extends AppCompatActivity implements Runnable {
             model.close();
         } catch (IOException e) {
             // TODO Handle the exception
-        // asdasd
 
 //        ONNX-Runtime
 //        final Map<String, OnnxTensor> inputs;
