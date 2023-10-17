@@ -1,0 +1,16 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.Yolov8Detect" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">#4F4789</item>
+        <item name="colorPrimaryVariant">#201335</item>
+        <item name="colorOnPrimary">#FFFDED</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">#4F4789</item>
+        <item name="colorSecondaryVariant">#201335</item>
+        <item name="colorOnSecondary">#FFFDED</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <!-- Customize your theme here. -->
+    </style>
+</resources>

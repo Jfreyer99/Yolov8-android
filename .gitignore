@@ -1,0 +1,58 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Gradle files
+.gradle/
+build/
+
+# Log/OS Files
+*.log
+
+# Android Studio generated files and folders
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+output.json
+
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services (e.g. APIs or Firebase)
+google-services.json
+
+# Android Profiling
+*.hprof
+
+/app/src/main/assets/fingerprint.pb
+/app/src/main/assets/metadata.yaml
+/app/src/main/assets/saved_model.pb
+/app/src/main/assets/small.onnx
+/app/src/main/assets/small.torchscript
+/app/src/main/assets/small.torchscript.ptl
+/app/src/main/assets/small2.onnx
+/app/src/main/assets/small2.required_operators.with_runtime_opt.config
+/app/src/main/assets/small2.with_runtime_opt.ort
+/app/src/main/assets/yolov8-best-nano.onnx
+/app/src/main/assets/yolov8-best-nano.torchscript
+/app/src/main/assets/yolov8-best-nano.with_runtime_opt.ort
+/app/src/main/assets/yolov8-best-nano_float16.tflite
