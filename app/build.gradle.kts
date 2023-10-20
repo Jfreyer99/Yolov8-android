@@ -46,7 +46,8 @@ dependencies {
     //implementation group: 'com.microsoft.onnxruntime', name: 'onnxruntime-android', version: '1.16.1'
 
     // https://mvnrepository.com/artifact/com.microsoft.onnxruntime/onnxruntime-mobile
-    //implementation group: 'com.microsoft.onnxruntime', name: 'onnxruntime-mobile', version: '1.16.1'
+    implementation("com.microsoft.onnxruntime:onnxruntime-mobile:1.16.1")
+
 
     implementation ("org.pytorch:pytorch_android:2.1.0")
     implementation ("org.pytorch:pytorch_android_torchvision:2.1.0")

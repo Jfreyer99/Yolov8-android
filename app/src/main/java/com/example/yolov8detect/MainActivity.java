@@ -14,6 +14,7 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -26,6 +27,7 @@ import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -33,11 +35,16 @@ import androidx.core.content.ContextCompat;
 
 import com.example.yolov8detect.ml.WoodDetector;
 
+import org.pytorch.IValue;
 import org.pytorch.Module;
+import org.pytorch.Tensor;
+import org.pytorch.torchvision.TensorImageUtils;
+import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.gpu.CompatibilityList;
 import org.tensorflow.lite.support.image.TensorImage;
 import org.tensorflow.lite.support.model.Model;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
+import org.tensorflow.lite.support.tensorbuffer.TensorBufferFloat;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -46,11 +53,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import ai.onnxruntime.OnnxTensor;
+import ai.onnxruntime.OnnxValue;
+import ai.onnxruntime.OrtEnvironment;
+import ai.onnxruntime.OrtException;
+import ai.onnxruntime.OrtSession;
+import ai.onnxruntime.providers.NNAPIFlags;
 
 public class MainActivity extends AppCompatActivity implements Runnable {
     private int mImageIndex = 0;
@@ -67,6 +86,8 @@ public class MainActivity extends AppCompatActivity implements Runnable {
     private ProgressBar mProgressBar;
     private Bitmap mBitmap = null;
     private Module mModule = null;
+    private OrtSession session;
+    private OrtEnvironment env;
     private float mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY;
 
     private final float max = 1.0f;
@@ -325,54 +346,60 @@ public class MainActivity extends AppCompatActivity implements Runnable {
     @Override
     public void run() {
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
-        //final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+        Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
 
 //        Tensorflow
-        TensorImage tensorImage = TensorImage.fromBitmap(resizedBitmap);
-
-        int[] values = tensorImage.getTensorBuffer().getIntArray();
-
-        OptionalInt minimum = Arrays.stream(values).min();
-        OptionalInt maximum = Arrays.stream(values).max();
-
-        minimum.ifPresent(System.out::println);
-        maximum.ifPresent(System.out::println);
-
-        float[] out = null;
-        try {
-
-            // Initialize interpreter with GPU delegate
-            Model.Options options;
-            CompatibilityList compatList = new CompatibilityList();
-            options = new Model.Options.Builder().setNumThreads(4).build();
-//            if(compatList.isDelegateSupportedOnThisDevice()){
-//                // if the device has a supported GPU, add the GPU delegate
-//                options = new Model.Options.Builder().setDevice(Model.Device.GPU).build();
-//            } else {
-//                // if the GPU is not supported, run on 4 threads
-//                options = new Model.Options.Builder().setNumThreads(4).build();
-//            }
-
-            @androidx.annotation.NonNull WoodDetector model = WoodDetector.newInstance(getApplicationContext(), options);
-
-            // Runs model inference and gets result.
-            WoodDetector.Outputs outputs = model.process(tensorImage);
-
-            WoodDetector.DetectionResult r = outputs.getDetectionResultList().get(0);
-
-            TensorBuffer buf = outputs.getCategoryAsTensorBuffer();
-            out = buf.getFloatArray();
-
-            // Gets result from DetectionResult.
-            //String location = detectionResult.getCategoryAsString();
-            //RectF category = detectionResult.getLocationAsRectF();
-
-            // Releases model resources if no longer used.
-            model.close();
-        } catch (IOException e) {
-            // TODO Handle the exception
-
-//        ONNX-Runtime
+//        TensorImage tensorImage = TensorImage.fromBitmap(resizedBitmap);
+//
+//        int[] shape = {1,640,640,3};
+//        TensorBuffer buf = TensorBuffer.createFixedSize(shape, DataType.FLOAT32);
+//        buf.loadBuffer(ByteBuffer.wrap());
+//
+//        int[] values = tensorImage.getTensorBuffer().getIntArray();
+//
+//        OptionalInt minimum = Arrays.stream(values).min();
+//        OptionalInt maximum = Arrays.stream(values).max();
+//
+//        minimum.ifPresent(System.out::println);
+//        maximum.ifPresent(System.out::println);
+//
+//        float[] out = null;
+//        try {
+//
+//            // Initialize interpreter with GPU delegate
+//            Model.Options options;
+//            CompatibilityList compatList = new CompatibilityList();
+//            options = new Model.Options.Builder().setNumThreads(4).build();
+////            if(compatList.isDelegateSupportedOnThisDevice()){
+////                // if the device has a supported GPU, add the GPU delegate
+////                options = new Model.Options.Builder().setDevice(Model.Device.GPU).build();
+////            } else {
+////                // if the GPU is not supported, run on 4 threads
+////                options = new Model.Options.Builder().setNumThreads(4).build();
+////            }
+//
+//            @androidx.annotation.NonNull WoodDetector model = WoodDetector.newInstance(getApplicationContext(), options);
+//
+//            //out = model.process(tensorImage.getTensorBuffer().getFloatArray()).getOutputFeature0AsTensorBuffer().getFloatArray();
+//
+//            System.out.println("h");
+//            // Runs model inference and gets result.
+////            WoodDetector.Outputs outputs = model.process(tensorImage);
+////
+////            TensorBuffer buf = outputs.getCategoryAsTensorBuffer();
+////            out = buf.getFloatArray();
+//
+//            // Gets result from DetectionResult.
+//            //String location = detectionResult.getCategoryAsString();
+//            //RectF category = detectionResult.getLocationAsRectF();
+//
+//            // Releases model resources if no longer used.
+//            model.close();
+//        } catch (IOException e) {
+//            // TODO Handle the exception
+//
+//        }
+        //ONNX-Runtime
 //        final Map<String, OnnxTensor> inputs;
 //        try {
 //            inputs = Map.of("images", OnnxTensor.createTensor(env, FloatBuffer.wrap(inputTensor.getDataAsFloatArray()), inputTensor.shape()));
@@ -381,8 +408,8 @@ public class MainActivity extends AppCompatActivity implements Runnable {
 //        }
 //
 //        float[] out = null;
-//        try (var results = session.run(inputs)) {
-//            var output = results.get("output0");
+//        try (OrtSession.Result results = session.run(inputs)) {
+//            Optional<OnnxValue> output = results.get("output0");
 //            if(output.isPresent()){
 //                final OnnxTensor t = OnnxTensor.createTensor(env, output.get().getValue());
 //                out = t.getFloatBuffer().array();
@@ -393,23 +420,24 @@ public class MainActivity extends AppCompatActivity implements Runnable {
 //        }
 
 //        PYTORCH
-//        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
-//        final Tensor outputTensor = outputTuple[0].toTensor();
-//        final float[] outputs = outputTensor.getDataAsFloatArray();
+        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
+        final Tensor outputTensor = outputTuple[0].toTensor();
+        final float[] outputs = outputTensor.getDataAsFloatArray();
 
 //        for(int i = 0; i < out.length; i++){
 //            out[i] = out[i]
 //        }
-        AtomicInteger max = new AtomicInteger();
-        AtomicInteger min = new AtomicInteger();
-        maximum.ifPresent(max::set);
-        minimum.ifPresent(min::set);
-        // Denormalize according to https://stats.stackexchange.com/questions/178626/how-to-normalize-data-between-1-and-1
-        for(int i = 0; i < out.length; i++){
-            out[i] = out[i] + 1.0f * (( (float) max.get()- (float) min.get()) / 2) + min.get();
-        }
+//        AtomicInteger max = new AtomicInteger();
+//        AtomicInteger min = new AtomicInteger();
+//        maximum.ifPresent(max::set);
+//        minimum.ifPresent(min::set);
+//
+//        // Denormalize according to https://stats.stackexchange.com/questions/178626/how-to-normalize-data-between-1-and-1
+//        for(int i = 0; i < out.length; i++){
+//            out[i] = out[i] * 127.5f;
+//        }
 
-        final ArrayList<Result> results =  PrePostProcessor.outputsToNMSPredictions(out, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+        final ArrayList<Result> results =  PrePostProcessor.outputsToNMSPredictions(outputs, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
 
         runOnUiThread(() -> {
             mButtonDetect.setEnabled(true);
