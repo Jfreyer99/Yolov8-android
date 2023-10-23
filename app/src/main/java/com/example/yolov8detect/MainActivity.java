@@ -49,6 +49,8 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import ai.onnxruntime.OrtException;
+
 public class MainActivity extends AppCompatActivity implements Runnable, AdapterView.OnItemSelectedListener {
     private int mImageIndex = 0;
     private final String[] mTestImages = {"test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg", "test5.jpg",};
@@ -368,5 +370,26 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
     public void onNothingSelected(AdapterView<?> parent) {
         runtimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
         this.currentRuntime = RunTime.Onnx;
+    }
+
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if(RuntimeHelper.model != null){
+            RuntimeHelper.model.close();
+        }
+        if(RuntimeHelper.mModule != null)
+        {
+            RuntimeHelper.mModule.destroy();
+        }
+        try {
+            if(RuntimeHelper.session != null)
+            RuntimeHelper.session.close();
+            RuntimeHelper.env.close();
+        } catch (OrtException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("Destory");
     }
 }

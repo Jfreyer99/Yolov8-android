@@ -37,7 +37,7 @@ import ai.onnxruntime.providers.NNAPIFlags;
 public class RuntimeHelper {
 
     public static OrtSession session = null;
-    private static OrtEnvironment env = null;
+    public static OrtEnvironment env = null;
     public static Module mModule = null;
 
     public static WoodDetector model;
@@ -216,5 +216,7 @@ public class RuntimeHelper {
     public static float[] getOutput(){
         return output;
     }
+
+
 
 }
