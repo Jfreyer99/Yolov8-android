@@ -160,4 +160,29 @@ public class PrePostProcessor {
 
         return nonMaxSuppression(results, mNmsLimit, IOU_THRESHOLD);
     }
+
+    static ArrayList<Result> outputsToNMSPredictionsTFLITE(float[] outputs, float imgScaleX, float imgScaleY, float ivScaleX, float ivScaleY, float startX, float startY){
+        ArrayList<Result> resultList = new ArrayList<>();
+
+        for(int i = 0; i < NUM_ELEMENTS; i++){
+
+            float cnf = outputs[i + 8400 * 4];
+            if(cnf >= CONFIDENCE_THRESHOLD) {
+
+                float cx = outputs[i] * 640;
+                float cy = outputs[i + 8400] * 640;
+                float w = outputs[i + 8400 * 2] * 640;
+                float h = outputs[i + 8400 * 3] * 640;
+
+                float x1 = cx - (w/2F);
+                float y1 = cy - (h/2F);
+                float x2 = cx + (w/2F);
+                float y2 = cy + (h/2F);
+
+                Rect rect = new Rect((int)(startX+ivScaleX*x1), (int)(startY+y1*ivScaleY), (int)(startX+ivScaleX*x2), (int)(startY+ivScaleY*y2));
+                resultList.add(new Result(0, cnf, rect));
+            }
+        }
+        return nonMaxSuppression(resultList, mNmsLimit, IOU_THRESHOLD);
+    }
 }
