@@ -3,4 +3,10 @@
     <color name="colorPrimary">#4F4789</color>
     <color name="colorPrimaryDark">#3700B3</color>
     <color name="colorAccent">#FFFDED</color>
+    <color name="colorPrimaryVariant">#3700B3</color>
+    <color name="colorOnPrimary">#000000</color>
+    <!-- Secondary brand color. -->
+    <color name="colorSecondary">#6200EE</color>
+    <color name="colorSecondaryVariant">#3700B3</color>
+    <color name="colorOnSecondary">#000000</color>
 </resources>

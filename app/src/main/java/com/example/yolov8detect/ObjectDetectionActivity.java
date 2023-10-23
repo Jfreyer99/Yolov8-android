@@ -3,9 +3,11 @@ package com.example.yolov8detect;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.media.Image;
+import android.util.Log;
 import android.view.TextureView;
 import android.view.ViewStub;
 
@@ -13,12 +15,20 @@ import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.camera.core.ImageProxy;
 
+import org.pytorch.Device;
+import org.pytorch.IValue;
+import org.pytorch.Module;
+import org.pytorch.Tensor;
+import org.pytorch.torchvision.TensorImageUtils;
+
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetectionActivity.AnalysisResult> {
-    //private Module mModule = null;
+    private Module mModule = null;
     private ResultView mResultView;
 
     static class AnalysisResult {
@@ -75,35 +85,34 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
     @WorkerThread
     @Nullable
     protected AnalysisResult analyzeImage(ImageProxy image, int rotationDegrees) {
-//        try {
-//            if (mModule == null) {
-//                mModule = Module.load(MainActivity.assetFilePath(getApplicationContext(), "small.torchscript"), null, Device.VULKAN);
-//            }
-//        } catch (IOException e) {
-//            Log.e("Object Detection", "Error reading assets", e);
-//            return null;
-//        }
-//        Bitmap bitmap = imgToBitmap(Objects.requireNonNull(image.getImage()));
-//        Matrix matrix = new Matrix();
-//        matrix.postRotate(90.0f);
-//        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-//        Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
-//
-//        final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
-//        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
-//
-//        //TODO GET outputTuple[1] for generating the masks
-//
-//        final Tensor outputTensor = outputTuple[0].toTensor();
-//        final float[] outputs = outputTensor.getDataAsFloatArray();
-//
-//        float imgScaleX = (float)bitmap.getWidth() / PrePostProcessor.mInputWidth;
-//        float imgScaleY = (float)bitmap.getHeight() / PrePostProcessor.mInputHeight;
-//        float ivScaleX = (float)mResultView.getWidth() / bitmap.getWidth();
-//        float ivScaleY = (float)mResultView.getHeight() / bitmap.getHeight();
-//
-//        final ArrayList<Result> results = PrePostProcessor.outputsToNMSPredictions(outputs, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
-//        return new AnalysisResult(results);
-        return null;
+        try {
+            if (mModule == null) {
+                mModule = Module.load(MainActivity.assetFilePath(getApplicationContext(), "small.torchscript"));
+            }
+        } catch (IOException e) {
+            Log.e("Object Detection", "Error reading assets", e);
+            return null;
+        }
+        Bitmap bitmap = imgToBitmap(Objects.requireNonNull(image.getImage()));
+        Matrix matrix = new Matrix();
+        matrix.postRotate(90.0f);
+        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+        Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+
+        final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
+
+        //TODO GET outputTuple[1] for generating the masks
+
+        final Tensor outputTensor = outputTuple[0].toTensor();
+        final float[] outputs = outputTensor.getDataAsFloatArray();
+
+        float imgScaleX = (float)bitmap.getWidth() / PrePostProcessor.mInputWidth;
+        float imgScaleY = (float)bitmap.getHeight() / PrePostProcessor.mInputHeight;
+        float ivScaleX = bitmap.getWidth() /  800.0f;
+        float ivScaleY = bitmap.getHeight() / 1200.0f;
+
+        final ArrayList<Result> results = PrePostProcessor.outputsToNMSPredictions(outputs, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 1200/640f);
+        return new AnalysisResult(results);
     }
 }

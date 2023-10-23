@@ -1,3 +1,6 @@
+import com.android.build.api.dsl.AaptOptions
+import com.android.build.api.dsl.AndroidResources
+
 plugins {
     id("com.android.application")
 }
@@ -18,7 +21,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false;
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -29,6 +32,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+
+ androidResources
+
     buildFeatures {
         mlModelBinding = true
     }
@@ -37,7 +43,7 @@ android {
 dependencies {
 
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.constraintlayout:constraintlayout:2.0.4")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     implementation ("androidx.camera:camera-core:1.0.0-alpha05")
     implementation ("androidx.camera:camera-camera2:1.0.0-alpha05")
@@ -48,17 +54,22 @@ dependencies {
     // https://mvnrepository.com/artifact/com.microsoft.onnxruntime/onnxruntime-mobile
     implementation("com.microsoft.onnxruntime:onnxruntime-mobile:1.16.1")
 
-
     implementation ("org.pytorch:pytorch_android:2.1.0")
     implementation ("org.pytorch:pytorch_android_torchvision:2.1.0")
 
-    //implementation ("org.pytorch:pytorch_android_lite:2.1.0")
-    //implementation ("org.pytorch:pytorch_android_torchvision:2.1.0")
+//    implementation ("org.pytorch:pytorch_android_lite:2.1.0")
+//    implementation ("org.pytorch:pytorch_android_torchvision:2.1.0")
 
     implementation("com.google.android.material:material:1.10.0")
+
+    // https://mvnrepository.com/artifact/org.tensorflow/tensorflow-lite
+    implementation("org.tensorflow:tensorflow-lite:2.13.0")
+
+
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-metadata:0.1.0")
+    implementation("org.tensorflow:tensorflow-lite-metadata:0.4.4")
     implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

@@ -14,6 +14,8 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.graphics.PointF;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
@@ -35,9 +37,23 @@ import androidx.core.content.ContextCompat;
 
 import com.example.yolov8detect.ml.WoodDetector;
 
-import org.pytorch.IValue;
+//import org.pytorch.IValue;
+//import org.pytorch.LiteModuleLoader;
+
+import org.pytorch.Device;
 import org.pytorch.Module;
+//import com.google.flatbuffers.FlatBufferBuilder;
+
+import org.pytorch.IValue;
+import org.pytorch.PyTorchAndroid;
 import org.pytorch.Tensor;
+import org.pytorch.torchvision.TensorImageUtils;
+import org.tensorflow.lite.DataType;
+import org.tensorflow.lite.gpu.CompatibilityList;
+import org.tensorflow.lite.support.image.ImageProcessor;
+import org.tensorflow.lite.support.model.Model;
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
+
 import org.pytorch.torchvision.TensorImageUtils;
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.gpu.CompatibilityList;
@@ -46,7 +62,14 @@ import org.tensorflow.lite.support.model.Model;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 import org.tensorflow.lite.support.tensorbuffer.TensorBufferFloat;
 
+import org.tensorflow.lite.support.common.ops.NormalizeOp;
+import org.tensorflow.lite.support.common.ops.QuantizeOp;
+import org.tensorflow.lite.support.image.ops.ResizeOp;
+import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp;
+import org.tensorflow.lite.support.image.ops.Rot90Op;
+
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -58,8 +81,10 @@ import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -76,8 +101,8 @@ public class MainActivity extends AppCompatActivity implements Runnable {
     private final String[] mTestImages = {"test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg", "test5.jpg",};
 
     private String modelPath = null;
-    //private OrtSession session = null;
-    //private OrtEnvironment env = null;
+    private OrtSession session = null;
+    private OrtEnvironment env = null;
     private TextView confidenceText;
     private TextView nmsLimitText;
     private ImageView mImageView;
@@ -86,8 +111,7 @@ public class MainActivity extends AppCompatActivity implements Runnable {
     private ProgressBar mProgressBar;
     private Bitmap mBitmap = null;
     private Module mModule = null;
-    private OrtSession session;
-    private OrtEnvironment env;
+
     private float mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY;
 
     private final float max = 1.0f;
@@ -148,7 +172,7 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         SeekBar confidence = findViewById(R.id.seekBarConfidence);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            confidence.setMin(12);
+            confidence.setMin(1);
         }
         confidence.setMax(100);
         confidence.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -264,29 +288,31 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         });
 
         try {
-              mModule = Module.load(MainActivity.assetFilePath(getApplicationContext(), "small.torchscript"));
-
-//            modelPath = MainActivity.assetFilePath(getApplicationContext(), "small2.with_runtime_opt.ort");
+            mModule = Module.load(MainActivity.assetFilePath(getApplicationContext(), "yolov8-best-nano.torchscript"), null, Device.VULKAN);
+//            modelPath = MainActivity.assetFilePath(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort");
 //
 //            env = OrtEnvironment.getEnvironment();
 //
 //            OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
 //
 //            sessionOptions.addConfigEntry("session.load_model_format", "ORT");
-//
-//            //Map<String, String> xnn = new HashMap<>();
-//            //xnn.put("intra_op_num_threads","1");
-//
-//            //sessionOptions.addXnnpack(xnn);
+////          sessionOptions.addConfigEntry("session.execution_mode", "ORTGPU");
+////          sessionOptions.addConfigEntry("session.gpu_device_id", "0");
 //            sessionOptions.addConfigEntry("kOrtSessionOptionsConfigAllowIntraOpSpinning", "0");
-//            sessionOptions.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL);
 //
-//            EnumSet<NNAPIFlags> flags = EnumSet.of(NNAPIFlags.USE_FP16);
+////          Map<String, String> xnn = new HashMap<>();
+////          xnn.put("intra_op_num_threads","1");
+////          sessionOptions.addXnnpack(xnn);
+//            sessionOptions.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
 //            sessionOptions.setIntraOpNumThreads(2);
-//            sessionOptions.setInterOpNumThreads(2);
-//            sessionOptions.addNnapi(flags);
+//              //sessionOptions.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.PARALLEL);
+//              //sessionOptions.setCPUArenaAllocator(true);
+//              //EnumSet<NNAPIFlags> flags = EnumSet.of(NNAPIFlags.USE_FP16);
+//              sessionOptions.addNnapi();
+////            //sessionOptions.addCPU(true);
 //
-//            //sessionOptions.addCPU(true);
+//            Map<String, String> config = sessionOptions.getConfigEntries();
+//
 //            session = env.createSession(modelPath, sessionOptions);
 
             BufferedReader br = new BufferedReader(new InputStreamReader(getAssets().open("classes.txt")));
@@ -302,6 +328,9 @@ public class MainActivity extends AppCompatActivity implements Runnable {
             Log.e("Object Detection", "Error reading assets", e);
             finish();
         }
+//        catch (OrtException e) {
+//            throw new RuntimeException(e);
+//        }
     }
 
     @Override
@@ -348,71 +377,67 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
         Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
 
-//        Tensorflow
-//        TensorImage tensorImage = TensorImage.fromBitmap(resizedBitmap);
-//
-//        int[] shape = {1,640,640,3};
-//        TensorBuffer buf = TensorBuffer.createFixedSize(shape, DataType.FLOAT32);
-//        buf.loadBuffer(ByteBuffer.wrap());
-//
-//        int[] values = tensorImage.getTensorBuffer().getIntArray();
-//
-//        OptionalInt minimum = Arrays.stream(values).min();
-//        OptionalInt maximum = Arrays.stream(values).max();
-//
-//        minimum.ifPresent(System.out::println);
-//        maximum.ifPresent(System.out::println);
-//
-//        float[] out = null;
-//        try {
-//
-//            // Initialize interpreter with GPU delegate
-//            Model.Options options;
-//            CompatibilityList compatList = new CompatibilityList();
-//            options = new Model.Options.Builder().setNumThreads(4).build();
-////            if(compatList.isDelegateSupportedOnThisDevice()){
-////                // if the device has a supported GPU, add the GPU delegate
-////                options = new Model.Options.Builder().setDevice(Model.Device.GPU).build();
-////            } else {
-////                // if the GPU is not supported, run on 4 threads
-////                options = new Model.Options.Builder().setNumThreads(4).build();
-////            }
-//
-//            @androidx.annotation.NonNull WoodDetector model = WoodDetector.newInstance(getApplicationContext(), options);
-//
-//            //out = model.process(tensorImage.getTensorBuffer().getFloatArray()).getOutputFeature0AsTensorBuffer().getFloatArray();
-//
-//            System.out.println("h");
-//            // Runs model inference and gets result.
-////            WoodDetector.Outputs outputs = model.process(tensorImage);
-////
-////            TensorBuffer buf = outputs.getCategoryAsTensorBuffer();
-////            out = buf.getFloatArray();
-//
-//            // Gets result from DetectionResult.
-//            //String location = detectionResult.getCategoryAsString();
-//            //RectF category = detectionResult.getLocationAsRectF();
-//
-//            // Releases model resources if no longer used.
-//            model.close();
-//        } catch (IOException e) {
-//            // TODO Handle the exception
-//
-//        }
+        int width = resizedBitmap.getWidth();
+        int height = resizedBitmap.getHeight();
+
+        int size = Math.min(height, width);
+
+        TensorImage img = TensorImage.fromBitmap(resizedBitmap);
+
+        ImageProcessor imageProcessor =
+                new ImageProcessor.Builder()
+                        .add(new ResizeWithCropOrPadOp(size, size))
+                        .add(new ResizeOp(640, 640, ResizeOp.ResizeMethod.BILINEAR))
+                        .add(new NormalizeOp(127.5f, 127.5f)).build();
+
+        img = imageProcessor.process(img);
+
+        //float[] in = inputTensor.getDataAsFloatArray();
+        float[] output = null;
+        float[] output2 = null;
+
+        try {
+
+            // Initialize interpreter with GPU delegate
+            Model.Options options;
+            options = new Model.Options.Builder().setNumThreads(4).setDevice(Model.Device.CPU).build();
+
+            WoodDetector model = WoodDetector.newInstance(getApplicationContext(), options);
+
+            // Creates inputs for reference.
+            TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 640, 640, 3}, DataType.FLOAT32);
+
+            inputFeature0.loadBuffer(img.getBuffer());
+
+            // Runs model inference and gets result.
+
+            WoodDetector.Outputs outputs = model.process(inputFeature0);
+
+            TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
+            TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
+
+            output = outputFeature0.getFloatArray();
+            output2 = outputFeature1.getFloatArray();
+            // Releases model resources if no longer used.
+            model.close();
+        } catch (IOException e) {
+            // TODO Handle the exception
+        }
+
         //ONNX-Runtime
-//        final Map<String, OnnxTensor> inputs;
+//        Map<String, OnnxTensor> inputs = new HashMap<>();
 //        try {
-//            inputs = Map.of("images", OnnxTensor.createTensor(env, FloatBuffer.wrap(inputTensor.getDataAsFloatArray()), inputTensor.shape()));
+//            inputs.put("images", OnnxTensor.createTensor(env, FloatBuffer.wrap(inputTensor.getDataAsFloatArray()), inputTensor.shape()));
 //        } catch (OrtException e) {
 //            throw new RuntimeException(e);
 //        }
 //
-//        float[] out = null;
+//        float[] outOnnx = null
 //        try (OrtSession.Result results = session.run(inputs)) {
-//            Optional<OnnxValue> output = results.get("output0");
-//            if(output.isPresent()){
-//                final OnnxTensor t = OnnxTensor.createTensor(env, output.get().getValue());
-//                out = t.getFloatBuffer().array();
+//            Optional<OnnxValue> outputOnnx = results.get("output0");
+//            if(outputOnnx.isPresent()){
+//                final OnnxTensor t = OnnxTensor.createTensor(env, outputOnnx.get().getValue());
+//                outOnnx = t.getFloatBuffer().array();
 //            }
 //        }
 //        catch(Exception e){
@@ -420,30 +445,61 @@ public class MainActivity extends AppCompatActivity implements Runnable {
 //        }
 
 //        PYTORCH
-        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
-        final Tensor outputTensor = outputTuple[0].toTensor();
-        final float[] outputs = outputTensor.getDataAsFloatArray();
+//        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
+//        PyTorchAndroid.setNumThreads(4);
+//        final Tensor outputTensor = outputTuple[0].toTensor();
+//        final float[] outputs = outputTensor.getDataAsFloatArray();
 
-//        for(int i = 0; i < out.length; i++){
-//            out[i] = out[i]
-//        }
+
 //        AtomicInteger max = new AtomicInteger();
 //        AtomicInteger min = new AtomicInteger();
 //        maximum.ifPresent(max::set);
 //        minimum.ifPresent(min::set);
-//
-//        // Denormalize according to https://stats.stackexchange.com/questions/178626/how-to-normalize-data-between-1-and-1
-//        for(int i = 0; i < out.length; i++){
-//            out[i] = out[i] * 127.5f;
-//        }
 
-        final ArrayList<Result> results =  PrePostProcessor.outputsToNMSPredictions(outputs, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+         //Denormalize according to https://stats.stackexchange.com/questions/178626/how-to-normalize-data-between-1-and-1
+
+        ArrayList<Result> resultList = new ArrayList<>();
+
+        float scale = 127.5f; // 255
+
+        for(int i = 0; i < 8400; i++){
+            //output[i] = (output[i] - 0) * ((640 - 0) / 1) + 0;
+
+            float cnf = output[i + 8400 * 4];
+            if(cnf >= PrePostProcessor.CONFIDENCE_THRESHOLD) {
+
+                float cx = output[i];
+                cx *= 640;
+
+                float cy = output[i + 8400];
+                cy *= 640;
+
+                float w = output[i + 8400 * 2];
+                w *= 640;
+
+                float h = output[i + 8400 * 3];
+                h *= 640;
+
+                float x1 = cx - (w/2F);
+                float y1 = cy - (h/2F);
+                float x2 = cx + (w/2F);
+                float y2 = cy + (h/2F);
+
+                Rect rect = new Rect((int)(mStartX+mIvScaleX*x1), (int)(mStartY+y1*mIvScaleY), (int)(mStartX+mIvScaleX*x2), (int)(mStartY+mIvScaleY*y2));
+                resultList.add(new Result(0, cnf, rect));
+                int a = 0;
+            }
+        }
+//
+        final ArrayList<Result> res = PrePostProcessor.nonMaxSuppression(resultList, PrePostProcessor.mNmsLimit, PrePostProcessor.CONFIDENCE_THRESHOLD);
+
+        //final ArrayList<Result> results =  PrePostProcessor.outputsToNMSPredictions(outputs, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
 
         runOnUiThread(() -> {
             mButtonDetect.setEnabled(true);
             mButtonDetect.setText(getString(R.string.detect));
             mProgressBar.setVisibility(ProgressBar.INVISIBLE);
-            mResultView.setResults(results);
+            mResultView.setResults(res);
             mResultView.invalidate();
             mResultView.setVisibility(View.VISIBLE);
         });
