@@ -10,6 +10,7 @@ import org.pytorch.IValue;
 import org.pytorch.Module;
 import org.pytorch.PyTorchAndroid;
 import org.pytorch.Tensor;
+
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.support.common.ops.NormalizeOp;
 import org.tensorflow.lite.support.image.ImageProcessor;
@@ -35,14 +36,13 @@ import ai.onnxruntime.providers.NNAPIFlags;
 
 public class RuntimeHelper {
 
-    private OrtSession session = null;
-    private OrtEnvironment env = null;
-    private Bitmap mBitmap = null;
-    private Module mModule = null;
+    public static OrtSession session = null;
+    private static OrtEnvironment env = null;
+    public static Module mModule = null;
 
-    private WoodDetector model;
+    public static WoodDetector model;
 
-    private float[] output;
+    private static float[] output;
 
     public RuntimeHelper(){
         output = new float[0];
@@ -54,12 +54,11 @@ public class RuntimeHelper {
      * @param assetName Name of the asset inside the asset folder
      * @param backend choose the backend on which the inference runs on
      */
-    public void createOnnxRuntime(Context ctx, String assetName, String backend){
-        //yolov8-best-nano.with_runtime_opt.ort
+    public static void createOnnxRuntime(Context ctx, String assetName, String backend){
         try {
 
             String modelPath = MainActivity.assetFilePath(ctx, assetName);
-            this.env = OrtEnvironment.getEnvironment();
+            env = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
 
             sessionOptions.addConfigEntry("session.load_model_format", "ORT");
@@ -78,7 +77,7 @@ public class RuntimeHelper {
             switch (backend.toUpperCase()){
                 case "NNAPI":
                     EnumSet<NNAPIFlags> flags = EnumSet.of(NNAPIFlags.USE_FP16);
-                    sessionOptions.addNnapi(flags);
+                    sessionOptions.addNnapi();
                     break;
                 case "CPU":
                     sessionOptions.addCPU(true);
@@ -86,7 +85,7 @@ public class RuntimeHelper {
             }
 
             sessionOptions.setCPUArenaAllocator(true);
-            this.session = env.createSession(modelPath, sessionOptions);
+            session = env.createSession(modelPath, sessionOptions);
 
         } catch(IOException | OrtException e){
 
@@ -98,7 +97,7 @@ public class RuntimeHelper {
      * @param inputTensor Tensor to run inference on
      * @return float[] for PostProcessing
      */
-    public Optional<float[]> invokeOnnxRuntime(Tensor inputTensor){
+    public static Optional<float[]> invokeOnnxRuntime(Tensor inputTensor){
         //ONNX-Runtime
         float[] outOnnx = null;
 
@@ -109,7 +108,7 @@ public class RuntimeHelper {
             throw new RuntimeException(e);
         }
 
-        try (OrtSession.Result results = this.session.run(inputs)) {
+        try (OrtSession.Result results = session.run(inputs)) {
             Optional<OnnxValue> outputOnnx = results.get("output0");
             if(outputOnnx.isPresent()){
                 final OnnxTensor t = OnnxTensor.createTensor(env, outputOnnx.get().getValue());
@@ -127,7 +126,7 @@ public class RuntimeHelper {
      * @param size size of the bitmap
      * @return new instance of ImageProcessor for Preprocessing the Bitmap before inference
      */
-    private ImageProcessor buildImageProcessor(int size){
+    private static ImageProcessor buildImageProcessor(int size){
                 return new ImageProcessor.Builder()
                         .add(new ResizeWithCropOrPadOp(size, size))
                         .add(new ResizeOp(PrePostProcessor.mInputHeight, PrePostProcessor.mInputWidth, ResizeOp.ResizeMethod.BILINEAR))
@@ -139,12 +138,12 @@ public class RuntimeHelper {
      * @param ctx Context of the Application
      * @param device Model.Device.NNAPI || Model.Device.CPU || Model.Device.GPU ----- GPU does not work currently
      */
-    public void createTensorFlowLiteRuntime(Context ctx, Model.Device device){
+    public static void createTensorFlowLiteRuntime(Context ctx, Model.Device device){
 
         try {
             Model.Options options;
             options = new Model.Options.Builder().setDevice(Model.Device.NNAPI).build();
-            this.model = WoodDetector.newInstance(ctx, options);
+            RuntimeHelper.model = WoodDetector.newInstance(ctx, options);
         } catch(Exception e){
 
         }
@@ -156,7 +155,7 @@ public class RuntimeHelper {
      * @param bmp Bitmap to run detection on
      * @return Optional that contains the float[] for postprocessing
      */
-    public Optional<float[]> invokeTensorFlowLiteRuntime(Bitmap bmp){
+    public static Optional<float[]> invokeTensorFlowLiteRuntime(Bitmap bmp){
         int width = bmp.getWidth();
         int height = bmp.getHeight();
         int size = Math.min(height, width);
@@ -174,7 +173,7 @@ public class RuntimeHelper {
         inputFeature0.loadBuffer(img.getBuffer());
 
         // Runs model inference and gets result.
-        WoodDetector.Outputs outputs = this.model.process(inputFeature0);
+        WoodDetector.Outputs outputs = model.process(inputFeature0);
 
         TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
         TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
@@ -183,7 +182,7 @@ public class RuntimeHelper {
         output2 = outputFeature1.getFloatArray();
 
         // Releases model resources if no longer used.
-        this.model.close();
+        //this.model.close();
 
         return Optional.of(output);
     }
@@ -194,15 +193,15 @@ public class RuntimeHelper {
      * @param assetName Name of the model inside the asset folder
      * @param device Device.CPU or Device.VULKAN
      */
-    public void usePyTorch(Context ctx, String assetName, Device device){
+    public static void usePyTorch(Context ctx, String assetName, Device device){
         try {
-            this.mModule = Module.load(MainActivity.assetFilePath(ctx, assetName), null, device);
+            mModule = Module.load(MainActivity.assetFilePath(ctx, assetName), null, device);
         } catch (IOException e){
 
         }
     }
 
-    public Optional<float[]> invokePyTorch(Tensor inputTensor, int numThreads){
+    public static Optional<float[]> invokePyTorch(Tensor inputTensor, int numThreads){
         IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
         PyTorchAndroid.setNumThreads(numThreads);
         final Tensor outputTensor = outputTuple[0].toTensor();
@@ -210,12 +209,12 @@ public class RuntimeHelper {
         return Optional.of(outputs);
     }
 
-    public void setOutputs(float[] output){
-        this.output = output;
+    public static void setOutputs(float[] output){
+        RuntimeHelper.output = output;
     }
 
-    public float[] getOutput(){
-        return this.output;
+    public static float[] getOutput(){
+        return output;
     }
 
 }

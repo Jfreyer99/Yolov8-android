@@ -36,13 +36,7 @@ public class PrePostProcessor {
     // model input image size
     static int mInputWidth = 640;
     static int mInputHeight = 640;
-
-    // model output is of size 25200*(num_of_class+5)
-    private static int mOutputRow = 8400; // as decided by the YOLOv5 model for input image of size 640*640
-    private static int mOutputColumn = 37; // left, top, right, bottom, score and 80 class probability
-    private static float mThreshold = 0.78f; // score above which a detection is generated
     public static int mNmsLimit = 40;
-
 
     private static final int TENSOR_WIDTH = 640;
     private static final int TENSOR_HEIGHT = 640;
@@ -56,7 +50,7 @@ public class PrePostProcessor {
     private static final int Y_POINTS = 160;
     private static final int MASKS_NUMBERS = 32;
     public static float CONFIDENCE_THRESHOLD = 0.78F;
-    public static float IOU_THRESHOLD = 0.3F;
+    public static float IOU_THRESHOLD = 0.5F;
 
     static String[] mClasses;
 

@@ -20,10 +20,13 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
@@ -46,7 +49,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements Runnable {
+public class MainActivity extends AppCompatActivity implements Runnable, AdapterView.OnItemSelectedListener {
     private int mImageIndex = 0;
     private final String[] mTestImages = {"test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg", "test5.jpg",};
     private TextView confidenceText;
@@ -63,6 +66,14 @@ public class MainActivity extends AppCompatActivity implements Runnable {
 
     private final float max = 1.0f;
     private final float min = 0.0f;
+
+    enum RunTime{
+        Onnx,
+        PyTorch,
+        TFLite
+    }
+
+    private RunTime currentRuntime = RunTime.Onnx;
 
     public static String assetFilePath(Context context, String assetName) throws IOException {
         File file = new File(context.getFilesDir(), assetName);
@@ -105,9 +116,6 @@ public class MainActivity extends AppCompatActivity implements Runnable {
             Log.e("Object Detection", "Error reading assets", e);
             finish();
         }
-
-        runtimeHelper = new RuntimeHelper();
-        runtimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
 
         mImageView = findViewById(R.id.imageView);
         mImageView.setImageBitmap(mBitmap);
@@ -186,6 +194,20 @@ public class MainActivity extends AppCompatActivity implements Runnable {
                 }
             }
         });
+
+        Spinner spinner = (Spinner) findViewById(R.id.runtimeSelector);
+        // Create an ArrayAdapter using the string array and a default spinner layout.
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                this,
+                R.array.runtime_array,
+                android.R.layout.simple_spinner_item
+        );
+        // Specify the layout to use when the list of choices appears.
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Apply the adapter to the spinner.
+        spinner.setAdapter(adapter);
+        spinner.setOnItemSelectedListener(this);
+
 
         final Button buttonSelect = findViewById(R.id.selectButton);
         buttonSelect.setOnClickListener(v -> {
@@ -298,24 +320,53 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
         Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
 
-        //runtimeHelper.usePyTorch(getApplicationContext(), "yolov8-best-nano.torchscript", Device.VULKAN);
-        //runtimeHelper.invokePyTorch(inputTensor, 4).ifPresent(floats -> runtimeHelper.setOutputs(floats));
+        ArrayList<Result> results = new ArrayList<>();
+        switch(currentRuntime){
+            case Onnx:
+                RuntimeHelper.invokeOnnxRuntime(inputTensor).ifPresent(RuntimeHelper::setOutputs);
+                results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                break;
+            case PyTorch:
+                RuntimeHelper.invokePyTorch(inputTensor, 4).ifPresent(RuntimeHelper::setOutputs);
+                results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                break;
+            case TFLite:
+                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
+                results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                break;
+        }
 
-        runtimeHelper.invokeOnnxRuntime(inputTensor).ifPresent(floats -> runtimeHelper.setOutputs(floats));
-
-        //runtimeHelper.createTensorFlowLiteRuntime(getApplicationContext(), Model.Device.NNAPI);
-        ///runtimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(floats -> runtimeHelper.setOutputs(floats));
-        //final ArrayList<Result> res = PrePostProcessor.outputsToNMSPredictionsTFLITE(runtimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
-
-        final ArrayList<Result> results =  PrePostProcessor.outputsToNMSPredictions(runtimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
-
+        final ArrayList<Result> finalResults = results;
         runOnUiThread(() -> {
             mButtonDetect.setEnabled(true);
             mButtonDetect.setText(getString(R.string.detect));
             mProgressBar.setVisibility(ProgressBar.INVISIBLE);
-            mResultView.setResults(results);
+            mResultView.setResults(finalResults);
             mResultView.invalidate();
             mResultView.setVisibility(View.VISIBLE);
         });
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+        switch (position){
+            case 0:
+                RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
+                this.currentRuntime = RunTime.Onnx;
+                break;//yolov8-best-nano.torchscript
+            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"small.torchscript", Device.CPU);
+            this.currentRuntime = RunTime.PyTorch;
+                break;
+            case 2: RuntimeHelper.createTensorFlowLiteRuntime(getApplicationContext(), Model.Device.NNAPI);
+                this.currentRuntime = RunTime.TFLite;
+                break;
+        }
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+        runtimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
+        this.currentRuntime = RunTime.Onnx;
     }
 }

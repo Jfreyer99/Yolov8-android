@@ -7,4 +7,9 @@
     <string name="select">Select</string>
     <string name="live">Live</string>
     <string name="chooseImage">Test Image 1/5</string>
+    <string-array name="runtime_array">
+        <item>Onnx</item>
+        <item>PyTorch</item>
+        <item>TFLite</item>
+    </string-array>
 </resources>
