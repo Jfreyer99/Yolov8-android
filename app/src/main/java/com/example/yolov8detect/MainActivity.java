@@ -468,17 +468,13 @@ public class MainActivity extends AppCompatActivity implements Runnable {
             float cnf = output[i + 8400 * 4];
             if(cnf >= PrePostProcessor.CONFIDENCE_THRESHOLD) {
 
-                float cx = output[i];
-                cx *= 640;
+                float cx = output[i] * 640;
 
-                float cy = output[i + 8400];
-                cy *= 640;
+                float cy = output[i + 8400] * 640;
 
-                float w = output[i + 8400 * 2];
-                w *= 640;
+                float w = output[i + 8400 * 2] * 640;
 
-                float h = output[i + 8400 * 3];
-                h *= 640;
+                float h = output[i + 8400 * 3] * 640;
 
                 float x1 = cx - (w/2F);
                 float y1 = cy - (h/2F);
