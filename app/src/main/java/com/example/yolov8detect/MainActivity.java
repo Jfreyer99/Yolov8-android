@@ -69,14 +69,6 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
     private final float max = 1.0f;
     private final float min = 0.0f;
 
-    enum RunTime{
-        Onnx,
-        PyTorch,
-        TFLite
-    }
-
-    private RunTime currentRuntime = RunTime.Onnx;
-
     public static String assetFilePath(Context context, String assetName) throws IOException {
         File file = new File(context.getFilesDir(), assetName);
         if (file.exists() && file.length() > 0) {
@@ -323,7 +315,7 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
         Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
 
         ArrayList<Result> results = new ArrayList<>();
-        switch(currentRuntime){
+        switch(RuntimeHelper.currentRuntime){
             case Onnx:
                 RuntimeHelper.invokeOnnxRuntime(inputTensor).ifPresent(RuntimeHelper::setOutputs);
                 results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
@@ -355,21 +347,21 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
         switch (position){
             case 0:
                 RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
-                this.currentRuntime = RunTime.Onnx;
-                break;//yolov8-best-nano.torchscript
-            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"small.torchscript", Device.CPU);
-            this.currentRuntime = RunTime.PyTorch;
+                RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.Onnx;
+                break;
+            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"yolov8-best-nano.torchscript", Device.CPU);
+                RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.PyTorch;
                 break;
             case 2: RuntimeHelper.createTensorFlowLiteRuntime(getApplicationContext(), Model.Device.NNAPI);
-                this.currentRuntime = RunTime.TFLite;
+                RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLite;
                 break;
         }
     }
 
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
-        runtimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
-        this.currentRuntime = RunTime.Onnx;
+        RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
+        RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.Onnx;
     }
 
 

@@ -94,19 +94,34 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
         Bitmap bitmap = imgToBitmap(Objects.requireNonNull(image.getImage()));
         Matrix matrix = new Matrix();
         matrix.postRotate(90.0f);
+
         bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
-
-        //final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
-
-        RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
 
         float imgScaleX = (float)bitmap.getWidth() / PrePostProcessor.mInputWidth;
         float imgScaleY = (float)bitmap.getHeight() / PrePostProcessor.mInputHeight;
         float ivScaleX = (float) mResultView.getWidth() / bitmap.getWidth();
         float ivScaleY = (float)mResultView.getHeight() / bitmap.getHeight();
 
-        final ArrayList<Result> results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+        ArrayList<Result> results = new ArrayList<>();
+
+        switch(RuntimeHelper.currentRuntime){
+            case Onnx:
+                final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+                RuntimeHelper.invokeOnnxRuntime(inputTensor).ifPresent(RuntimeHelper::setOutputs);
+                results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+                break;
+            case PyTorch:
+                final Tensor inputTensorOnnx = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+                RuntimeHelper.invokePyTorch(inputTensorOnnx, 4).ifPresent(RuntimeHelper::setOutputs);
+                results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+                break;
+            case TFLite:
+                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
+                results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+                break;
+        }
+
         return new AnalysisResult(results);
     }
 }

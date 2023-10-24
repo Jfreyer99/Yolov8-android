@@ -36,6 +36,14 @@ import ai.onnxruntime.providers.NNAPIFlags;
 
 public class RuntimeHelper {
 
+    public enum RunTime{
+        Onnx,
+        PyTorch,
+        TFLite
+    }
+
+    public static RunTime currentRuntime = RunTime.Onnx;
+
     public static OrtSession session = null;
     public static OrtEnvironment env = null;
     public static Module mModule = null;
@@ -216,7 +224,5 @@ public class RuntimeHelper {
     public static float[] getOutput(){
         return output;
     }
-
-
 
 }
