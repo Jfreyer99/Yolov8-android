@@ -376,9 +376,10 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
             RuntimeHelper.mModule.destroy();
         }
         try {
-            if(RuntimeHelper.session != null)
-            RuntimeHelper.session.close();
-            RuntimeHelper.env.close();
+            if(RuntimeHelper.session != null) {
+                RuntimeHelper.session.close();
+                RuntimeHelper.env.close();
+            }
         } catch (OrtException e) {
             throw new RuntimeException(e);
         }
