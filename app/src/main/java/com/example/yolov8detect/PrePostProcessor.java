@@ -1,9 +1,3 @@
-// Copyright (c) 2020 Facebook, Inc. and its affiliates.
-// All rights reserved.
-//
-// This source code is licensed under the BSD-style license found in the
-// LICENSE file in the root directory of this source tree.
-
 package com.example.yolov8detect;
 
 import android.graphics.Rect;
@@ -178,5 +172,40 @@ public class PrePostProcessor {
             }
         }
         return nonMaxSuppression(resultList, mNmsLimit, IOU_THRESHOLD);
+    }
+
+    /**
+     * Method does not need NMS because NMS is inbedded into the model itself, depending on the model used max_outputs=200 || max_outputs=300
+     * @param scores
+     * @param boxes
+     * @param imgScaleX
+     * @param imgScaleY
+     * @param ivScaleX
+     * @param ivScaleY
+     * @param startX
+     * @param startY
+     * @return
+     */
+    static ArrayList<Result> outputsTFLITESSD(float[] scores, float[] boxes, float imgScaleX, float imgScaleY, float ivScaleX, float ivScaleY, float startX, float startY){
+
+        ArrayList<Result> results = new ArrayList<>();
+
+        for(int i = 0; i < scores.length; i++){
+
+            if(scores[i] >= PrePostProcessor.CONFIDENCE_THRESHOLD){
+
+                int xminIdx = i*4;
+
+                float y1 = boxes[xminIdx] * 640;
+                float x1 = boxes[xminIdx+1] * 640;
+                float y2 = boxes[xminIdx+2] * 640;
+                float x2 = boxes[xminIdx+3] * 640;
+
+                Rect rect = new Rect((int)(startX+ivScaleX*x1), (int)(startY+y1*ivScaleY), (int)(startX+ivScaleX*x2), (int)(startY+ivScaleY*y2));
+                results.add(new Result(0, scores[i], rect));
+            }
+        }
+
+        return results;
     }
 }

@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 
 import com.example.yolov8detect.ml.WoodDetector;
+import com.example.yolov8detect.ml.WoodDetectorFP16;
+import com.example.yolov8detect.ml.WoodSSD;
 
 import org.pytorch.Device;
 import org.pytorch.IValue;
@@ -39,7 +41,26 @@ public class RuntimeHelper {
     public enum RunTime{
         Onnx,
         PyTorch,
-        TFLite
+        TFLite,
+        TFLITE_SSD
+    }
+
+    public static class SSDResult{
+        public float[] scores;
+        public float[] boxes;
+
+        public SSDResult(float[] scores, float[] boxes) {
+            this.scores = scores;
+            this.boxes = boxes;
+        }
+
+        public float[] getScores() {
+            return scores;
+        }
+
+        public float[] getBoxes() {
+            return boxes;
+        }
     }
 
     public static RunTime currentRuntime = RunTime.Onnx;
@@ -50,7 +71,13 @@ public class RuntimeHelper {
 
     public static WoodDetector model;
 
+    public static WoodDetectorFP16 modelFP16;
+
+    public static WoodSSD woodSSD;
+
     private static float[] output;
+
+    private static SSDResult ssdResult;
 
     public RuntimeHelper(){
         output = new float[0];
@@ -134,10 +161,10 @@ public class RuntimeHelper {
      * @param size size of the bitmap
      * @return new instance of ImageProcessor for Preprocessing the Bitmap before inference
      */
-    private static ImageProcessor buildImageProcessor(int size){
+    private static ImageProcessor buildImageProcessor(int size, int targetHeight, int targetWidth){
                 return new ImageProcessor.Builder()
                         .add(new ResizeWithCropOrPadOp(size, size))
-                        .add(new ResizeOp(PrePostProcessor.mInputHeight, PrePostProcessor.mInputWidth, ResizeOp.ResizeMethod.BILINEAR))
+                        .add(new ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
                         .add(new NormalizeOp(127.5f, 127.5f)).build();
     }
 
@@ -150,12 +177,66 @@ public class RuntimeHelper {
 
         try {
             Model.Options options;
-            options = new Model.Options.Builder().setDevice(Model.Device.NNAPI).build();
+            options = new Model.Options.Builder().setDevice(device).setNumThreads(4).build();
             RuntimeHelper.model = WoodDetector.newInstance(ctx, options);
-        } catch(Exception e){
 
+            //RuntimeHelper.modelFP16 = WoodDetectorFP16.newInstance(ctx, options);
+
+            System.out.println("a");
+        } catch(Exception e){
+            System.out.println(e);
         }
 
+    }
+
+    public static void createTensorFlowLiteRuntineSSD(Context ctx, Model.Device device){
+        try {
+            Model.Options options;
+            options = new Model.Options.Builder().setDevice(device).setNumThreads(8).build();
+
+            RuntimeHelper.woodSSD = WoodSSD.newInstance(ctx, options);
+
+        } catch (IOException e) {
+            // TODO Handle the exception
+        }
+    }
+
+    public static Optional<SSDResult> invokeTensorFlowLiteRuntimeSSD(Bitmap bmp)
+    {
+        int width = bmp.getWidth();
+        int height = bmp.getHeight();
+        int size = Math.min(height, width);
+
+        TensorImage img = TensorImage.fromBitmap(bmp);
+
+        img = buildImageProcessor(size, 320, 320).process(img);
+
+        float[] output;
+        float[] output2 = null;
+
+        // Creates inputs for reference.
+        TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 320, 320, 3}, DataType.FLOAT32);
+        inputFeature0.loadBuffer(img.getBuffer());
+
+//        ymin = int(max(1,(boxes[i][0] * imH)))
+//        xmin = int(max(1,(boxes[i][1] * imW)))
+//        ymax = int(min(imH,(boxes[i][2] * imH)))
+//        xmax = int(min(imW,(boxes[i][3] * imW)))
+
+        // Runs model inference and gets result.
+        WoodSSD.Outputs outputs = RuntimeHelper.woodSSD.process(inputFeature0);
+        TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
+        TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
+        TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();
+        TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
+
+
+        float[] scores = outputFeature0.getFloatArray();
+        float[] boxes = outputFeature1.getFloatArray();
+
+        SSDResult result = new SSDResult(scores, boxes);
+
+        return Optional.of(result);
     }
 
     /**
@@ -170,7 +251,7 @@ public class RuntimeHelper {
 
         TensorImage img = TensorImage.fromBitmap(bmp);
 
-        img = buildImageProcessor(size).process(img);
+        img = buildImageProcessor(size, 640, 640).process(img);
 
         float[] output;
         float[] output2 = null;
@@ -179,6 +260,8 @@ public class RuntimeHelper {
         TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 640, 640, 3}, DataType.FLOAT32);
 
         inputFeature0.loadBuffer(img.getBuffer());
+
+        //WoodDetectorFP16.Outputs outputs = RuntimeHelper.modelFP16.process(inputFeature0);
 
         // Runs model inference and gets result.
         WoodDetector.Outputs outputs = model.process(inputFeature0);
@@ -225,4 +308,11 @@ public class RuntimeHelper {
         return output;
     }
 
+    public static SSDResult getSsdResult() {
+        return ssdResult;
+    }
+
+    public static void setSsdResult(SSDResult ssdResult) {
+        RuntimeHelper.ssdResult = ssdResult;
+    }
 }

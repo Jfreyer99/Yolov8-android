@@ -7,7 +7,6 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.media.Image;
-import android.util.Log;
 import android.view.TextureView;
 import android.view.ViewStub;
 
@@ -15,21 +14,16 @@ import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.camera.core.ImageProxy;
 
-import org.pytorch.Device;
-import org.pytorch.IValue;
-import org.pytorch.Module;
 import org.pytorch.Tensor;
 import org.pytorch.torchvision.TensorImageUtils;
 import org.tensorflow.lite.support.model.Model;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Objects;
 
 public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetectionActivity.AnalysisResult> {
-    private Module mModule = null;
     private ResultView mResultView;
 
     static class AnalysisResult {
@@ -119,6 +113,10 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
             case TFLite:
                 RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
                 results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+                break;
+            case TFLITE_SSD:
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap).ifPresent(RuntimeHelper::setSsdResult);
+                results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
         }
 

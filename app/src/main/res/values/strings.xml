@@ -11,5 +11,6 @@
         <item>Onnx</item>
         <item>PyTorch</item>
         <item>TFLite</item>
+        <item>SSD_TFLITE</item>
     </string-array>
 </resources>

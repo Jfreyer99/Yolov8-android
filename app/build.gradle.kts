@@ -60,12 +60,12 @@ dependencies {
     implementation("com.google.android.material:material:1.10.0")
 
     // https://mvnrepository.com/artifact/org.tensorflow/tensorflow-lite
-    implementation("org.tensorflow:tensorflow-lite:2.13.0")
-
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
 
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     implementation("org.tensorflow:tensorflow-lite-metadata:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
+
 
 
     testImplementation("junit:junit:4.13.2")

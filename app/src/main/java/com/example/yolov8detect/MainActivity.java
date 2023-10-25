@@ -1,9 +1,3 @@
-// Copyright (c) 2020 Facebook, Inc. and its affiliates.
-// All rights reserved.
-//
-// This source code is licensed under the BSD-style license found in the
-// LICENSE file in the root directory of this source tree.
-
 package com.example.yolov8detect;
 
 import android.Manifest;
@@ -48,6 +42,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import ai.onnxruntime.OrtException;
 
@@ -61,11 +56,7 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
     private Button mButtonDetect;
     private ProgressBar mProgressBar;
     private Bitmap mBitmap = null;
-
-    private RuntimeHelper runtimeHelper;
-
     private float mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY;
-
     private final float max = 1.0f;
     private final float min = 0.0f;
 
@@ -122,6 +113,8 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
 
         //private model = W.newInstance(getApplicationContext());
         SeekBar confidence = findViewById(R.id.seekBarConfidence);
+
+        RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.CPU);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             confidence.setMin(1);
@@ -328,6 +321,10 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
                 results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
                 break;
+            case TFLITE_SSD:
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap).ifPresent(RuntimeHelper::setSsdResult);
+                results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                break;
         }
 
         final ArrayList<Result> finalResults = results;
@@ -349,12 +346,16 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.Onnx;
                 break;
-            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"yolov8-best-nano.torchscript", Device.CPU);
+            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"yolov8-best-nano.torchscript", Device.VULKAN);
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.PyTorch;
                 break;
-            case 2: RuntimeHelper.createTensorFlowLiteRuntime(getApplicationContext(), Model.Device.NNAPI);
+            case 2:
+                RuntimeHelper.createTensorFlowLiteRuntime(getApplicationContext(), Model.Device.NNAPI);
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLite;
                 break;
+            case 3:
+                RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.NNAPI);
+                RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLITE_SSD;
         }
     }
 
@@ -368,8 +369,8 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if(RuntimeHelper.model != null){
-            RuntimeHelper.model.close();
+        if(RuntimeHelper.modelFP16 != null){
+            RuntimeHelper.modelFP16.close();
         }
         if(RuntimeHelper.mModule != null)
         {
