@@ -9,6 +9,9 @@ import com.example.yolov8detect.ml.WoodSSD;
 
 import org.pytorch.Device;
 import org.pytorch.IValue;
+
+
+import org.pytorch.LiteModuleLoader;
 import org.pytorch.Module;
 import org.pytorch.PyTorchAndroid;
 import org.pytorch.Tensor;
@@ -107,12 +110,13 @@ public class RuntimeHelper {
 
             sessionOptions.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
             sessionOptions.setIntraOpNumThreads(4);
+            sessionOptions.setInterOpNumThreads(4);
             sessionOptions.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.PARALLEL);
 
             switch (backend.toUpperCase()){
                 case "NNAPI":
                     EnumSet<NNAPIFlags> flags = EnumSet.of(NNAPIFlags.USE_FP16);
-                    sessionOptions.addNnapi();
+                    sessionOptions.addNnapi(flags);
                     break;
                 case "CPU":
                     sessionOptions.addCPU(true);
@@ -211,9 +215,6 @@ public class RuntimeHelper {
 
         img = buildImageProcessor(size, 320, 320).process(img);
 
-        float[] output;
-        float[] output2 = null;
-
         // Creates inputs for reference.
         TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 320, 320, 3}, DataType.FLOAT32);
         inputFeature0.loadBuffer(img.getBuffer());
@@ -225,10 +226,11 @@ public class RuntimeHelper {
 
         // Runs model inference and gets result.
         WoodSSD.Outputs outputs = RuntimeHelper.woodSSD.process(inputFeature0);
+
         TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
         TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
-        TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();
-        TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
+        //TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();
+        //TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
 
 
         float[] scores = outputFeature0.getFloatArray();
@@ -254,7 +256,7 @@ public class RuntimeHelper {
         img = buildImageProcessor(size, 640, 640).process(img);
 
         float[] output;
-        float[] output2 = null;
+        //float[] output2 = null;
 
         // Creates inputs for reference.
         TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 640, 640, 3}, DataType.FLOAT32);
@@ -267,10 +269,10 @@ public class RuntimeHelper {
         WoodDetector.Outputs outputs = model.process(inputFeature0);
 
         TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
-        TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
+        //TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
 
         output = outputFeature0.getFloatArray();
-        output2 = outputFeature1.getFloatArray();
+        //output2 = outputFeature1.getFloatArray();
 
         // Releases model resources if no longer used.
         //this.model.close();
@@ -286,7 +288,8 @@ public class RuntimeHelper {
      */
     public static void usePyTorch(Context ctx, String assetName, Device device){
         try {
-            mModule = Module.load(MainActivity.assetFilePath(ctx, assetName), null, device);
+            mModule = LiteModuleLoader.load(MainActivity.assetFilePath(ctx.getApplicationContext(), assetName));
+            //mModule = Module.load(MainActivity.assetFilePath(ctx, assetName), null, device);
         } catch (IOException e){
 
         }

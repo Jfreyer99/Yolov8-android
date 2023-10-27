@@ -81,13 +81,9 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
     @Nullable
     protected AnalysisResult analyzeImage(ImageProxy image, int rotationDegrees) {
 
-        if (RuntimeHelper.model == null) {
-            RuntimeHelper.createTensorFlowLiteRuntime(getApplicationContext(), Model.Device.NNAPI);
-        }
-
         Bitmap bitmap = imgToBitmap(Objects.requireNonNull(image.getImage()));
         Matrix matrix = new Matrix();
-        matrix.postRotate(90.0f);
+        matrix.postRotate(rotationDegrees);
 
         bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);

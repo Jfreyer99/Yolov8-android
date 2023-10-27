@@ -346,7 +346,7 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.Onnx;
                 break;
-            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"yolov8-best-nano.torchscript", Device.VULKAN);
+            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"best-nano.ptl", Device.VULKAN);
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.PyTorch;
                 break;
             case 2:
@@ -354,7 +354,7 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLite;
                 break;
             case 3:
-                RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.NNAPI);
+                RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.CPU);
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLITE_SSD;
         }
     }
