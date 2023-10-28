@@ -111,7 +111,11 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
                 results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
             case TFLITE_SSD:
-                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap).ifPresent(RuntimeHelper::setSsdResult);
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap, 320).ifPresent(RuntimeHelper::setSsdResult);
+                results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+                break;
+            case TFLITE_SSD640:
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap, 640).ifPresent(RuntimeHelper::setSsdResult);
                 results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
         }

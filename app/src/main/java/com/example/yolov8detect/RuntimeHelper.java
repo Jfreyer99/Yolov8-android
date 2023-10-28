@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import com.example.yolov8detect.ml.WoodDetector;
 import com.example.yolov8detect.ml.WoodDetectorFP16;
 import com.example.yolov8detect.ml.WoodSSD;
+import com.example.yolov8detect.ml.WoodSSD640;
 
 import org.pytorch.Device;
 import org.pytorch.IValue;
@@ -45,7 +46,8 @@ public class RuntimeHelper {
         Onnx,
         PyTorch,
         TFLite,
-        TFLITE_SSD
+        TFLITE_SSD,
+        TFLITE_SSD640
     }
 
     public static class SSDResult{
@@ -75,6 +77,8 @@ public class RuntimeHelper {
     public static WoodDetector model;
 
     public static WoodDetectorFP16 modelFP16;
+
+    public static WoodSSD640 woodSSD640;
 
     public static WoodSSD woodSSD;
 
@@ -193,19 +197,54 @@ public class RuntimeHelper {
 
     }
 
-    public static void createTensorFlowLiteRuntineSSD(Context ctx, Model.Device device){
+    public static void createTensorFlowLiteRuntineSSD(Context ctx, Model.Device device, int modelSize){
         try {
             Model.Options options;
             options = new Model.Options.Builder().setDevice(device).setNumThreads(8).build();
 
-            RuntimeHelper.woodSSD = WoodSSD.newInstance(ctx, options);
+            switch(modelSize){
+                case 640: RuntimeHelper.woodSSD640 = WoodSSD640.newInstance(ctx, options);
+                    break;
+                case 320: RuntimeHelper.woodSSD = WoodSSD.newInstance(ctx, options);
+                    break;
+            }
 
         } catch (IOException e) {
             // TODO Handle the exception
         }
     }
 
-    public static Optional<SSDResult> invokeTensorFlowLiteRuntimeSSD(Bitmap bmp)
+    private static Optional<SSDResult> processSSD(TensorImage img, int size, int modelInputSize){
+        img = buildImageProcessor(size, modelInputSize, modelInputSize).process(img);
+        // Creates inputs for reference.
+        TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, modelInputSize, modelInputSize, 3}, DataType.FLOAT32);
+        inputFeature0.loadBuffer(img.getBuffer());
+        // Runs model inference and gets result.
+
+        if(modelInputSize == 640){
+            WoodSSD640.Outputs outputs= RuntimeHelper.woodSSD640.process(inputFeature0);
+            TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
+            TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
+            //TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();// TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
+            float[] scores = outputFeature0.getFloatArray();
+            float[] boxes = outputFeature1.getFloatArray();
+            SSDResult result = new SSDResult(scores, boxes);
+            return Optional.of(result);
+        }
+
+        WoodSSD.Outputs outputs= RuntimeHelper.woodSSD.process(inputFeature0);
+        TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
+        TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
+        //TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();// TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
+        float[] scores = outputFeature0.getFloatArray();
+        float[] boxes = outputFeature1.getFloatArray();
+
+        SSDResult result = new SSDResult(scores, boxes);
+
+        return Optional.of(result);
+    }
+
+    public static Optional<SSDResult> invokeTensorFlowLiteRuntimeSSD(Bitmap bmp, int modelInputSize)
     {
         int width = bmp.getWidth();
         int height = bmp.getHeight();
@@ -213,32 +252,7 @@ public class RuntimeHelper {
 
         TensorImage img = TensorImage.fromBitmap(bmp);
 
-        img = buildImageProcessor(size, 320, 320).process(img);
-
-        // Creates inputs for reference.
-        TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 320, 320, 3}, DataType.FLOAT32);
-        inputFeature0.loadBuffer(img.getBuffer());
-
-//        ymin = int(max(1,(boxes[i][0] * imH)))
-//        xmin = int(max(1,(boxes[i][1] * imW)))
-//        ymax = int(min(imH,(boxes[i][2] * imH)))
-//        xmax = int(min(imW,(boxes[i][3] * imW)))
-
-        // Runs model inference and gets result.
-        WoodSSD.Outputs outputs = RuntimeHelper.woodSSD.process(inputFeature0);
-
-        TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
-        TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
-        //TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();
-        //TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
-
-
-        float[] scores = outputFeature0.getFloatArray();
-        float[] boxes = outputFeature1.getFloatArray();
-
-        SSDResult result = new SSDResult(scores, boxes);
-
-        return Optional.of(result);
+        return RuntimeHelper.processSSD(img, size, modelInputSize);
     }
 
     /**

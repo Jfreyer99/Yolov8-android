@@ -12,5 +12,6 @@
         <item>PyTorch</item>
         <item>TFLite</item>
         <item>SSD_TFLITE</item>
+        <item>SSD_TFLITE640</item>
     </string-array>
 </resources>

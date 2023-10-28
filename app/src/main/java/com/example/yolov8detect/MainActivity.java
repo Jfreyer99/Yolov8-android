@@ -114,8 +114,6 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
         //private model = W.newInstance(getApplicationContext());
         SeekBar confidence = findViewById(R.id.seekBarConfidence);
 
-        RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.CPU);
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             confidence.setMin(1);
         }
@@ -322,7 +320,11 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
                 break;
             case TFLITE_SSD:
-                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap).ifPresent(RuntimeHelper::setSsdResult);
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap, 320).ifPresent(RuntimeHelper::setSsdResult);
+                results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                break;
+            case TFLITE_SSD640:
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap, 640).ifPresent(RuntimeHelper::setSsdResult);
                 results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
                 break;
         }
@@ -354,8 +356,13 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLite;
                 break;
             case 3:
-                RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.CPU);
+                RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.CPU, 320);
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLITE_SSD;
+                break;
+            case 4:
+                RuntimeHelper.createTensorFlowLiteRuntineSSD(getApplicationContext(), Model.Device.CPU, 640);
+                RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.TFLITE_SSD640;
+                break;
         }
     }
 
