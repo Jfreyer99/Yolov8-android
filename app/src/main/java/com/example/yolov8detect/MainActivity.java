@@ -41,8 +41,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 import ai.onnxruntime.OrtException;
 
@@ -59,6 +61,9 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
     private float mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY;
     private final float max = 1.0f;
     private final float min = 0.0f;
+
+    private long[] completeTime = new long[RuntimeHelper.benchmarkSize];
+    private int counter = 0;
 
     public static String assetFilePath(Context context, String assetName) throws IOException {
         File file = new File(context.getFilesDir(), assetName);
@@ -302,32 +307,62 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
 
     @Override
     public void run() {
-        Bitmap resizedBitmap = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
-        Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
 
         ArrayList<Result> results = new ArrayList<>();
         switch(RuntimeHelper.currentRuntime){
             case Onnx:
+                long startTime = System.currentTimeMillis();
+                Bitmap resizedBitmapOnnx = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+                Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmapOnnx, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
                 RuntimeHelper.invokeOnnxRuntime(inputTensor).ifPresent(RuntimeHelper::setOutputs);
                 results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                long endTime = System.currentTimeMillis();
+                //completeTime[counter] = endTime-startTime;
                 break;
             case PyTorch:
-                RuntimeHelper.invokePyTorch(inputTensor, 4).ifPresent(RuntimeHelper::setOutputs);
+                long startTime2 = System.currentTimeMillis();
+                Bitmap resizedBitmapPyTorch = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+                Tensor inputTensorPy = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmapPyTorch, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+                RuntimeHelper.invokePyTorchDetect(inputTensorPy).ifPresent(RuntimeHelper::setOutputs);
                 results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                long endTime2 = System.currentTimeMillis();
+                //completeTime[counter] = endTime2-startTime2;
                 break;
             case TFLite:
-                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
+                long startTime3 = System.currentTimeMillis();
+                Bitmap resizedBitmapTFLite = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmapTFLite).ifPresent(RuntimeHelper::setOutputs);
                 results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                long endTime3 = System.currentTimeMillis();
+                //completeTime[counter] = endTime3-startTime3;
                 break;
             case TFLITE_SSD:
-                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap, 320).ifPresent(RuntimeHelper::setSsdResult);
+                long startTime4 = System.currentTimeMillis();
+                Bitmap resizedBitmapSSD = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmapSSD, 320).ifPresent(RuntimeHelper::setSsdResult);
                 results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                long endTime4 = System.currentTimeMillis();
+                //completeTime[counter] = endTime4-startTime4;
                 break;
             case TFLITE_SSD640:
-                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmap, 640).ifPresent(RuntimeHelper::setSsdResult);
+                long startTime5 = System.currentTimeMillis();
+                Bitmap resizedBitmapSSD640 = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+                RuntimeHelper.invokeTensorFlowLiteRuntimeSSD(resizedBitmapSSD640, 640).ifPresent(RuntimeHelper::setSsdResult);
                 results = PrePostProcessor.outputsTFLITESSD(RuntimeHelper.getSsdResult().scores, RuntimeHelper.getSsdResult().boxes, mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+                long endTime5 = System.currentTimeMillis();
+                //completeTime[counter] = endTime5-startTime5;
                 break;
         }
+
+//        if(counter == completeTime.length-1){
+//            double meanOverall = calculateMeanOverall(completeTime);
+//            double meanInference = calculateMeanInference(RuntimeHelper.inference);
+//            System.out.println("Complete: " + meanOverall);
+//            System.out.println("Inference " + meanInference);
+//            System.out.println("Processing " + (meanOverall-meanInference));
+//            RuntimeHelper.counter = 0;
+//            counter = 0;
+//        }
 
         final ArrayList<Result> finalResults = results;
         runOnUiThread(() -> {
@@ -338,6 +373,17 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
             mResultView.invalidate();
             mResultView.setVisibility(View.VISIBLE);
         });
+        //counter++;
+    }
+
+    public double calculateMeanOverall(long[] inputs){
+        OptionalDouble avg = Arrays.stream(inputs).average();
+        return avg.isPresent() ? avg.getAsDouble(): 0.0;
+    }
+
+    public double calculateMeanInference(long[] inputs){
+        OptionalDouble avg = Arrays.stream(inputs).average();
+        return avg.isPresent() ? avg.getAsDouble(): 0.0;
     }
 
     @Override
@@ -345,10 +391,10 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
 
         switch (position){
             case 0:
-                RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
+                RuntimeHelper.createOnnxRuntime(getApplicationContext(), "pytorchn-detect-320.with_runtime_opt.ort", "NNAPI");
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.Onnx;
                 break;
-            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"best-nano.ptl", Device.VULKAN);
+            case 1: RuntimeHelper.usePyTorch(getApplicationContext(),"pytorchn-detect-320.torchscript", 4);
                 RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.PyTorch;
                 break;
             case 2:
@@ -366,9 +412,10 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
         }
     }
 
+
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
-        RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "NNAPI");
+        RuntimeHelper.createOnnxRuntime(getApplicationContext(), "yolov8-best-nano.with_runtime_opt.ort", "CPU");
         RuntimeHelper.currentRuntime = RuntimeHelper.RunTime.Onnx;
     }
 

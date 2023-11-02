@@ -3,7 +3,7 @@ package com.example.yolov8detect;
 import android.content.Context;
 import android.graphics.Bitmap;
 
-import com.example.yolov8detect.ml.WoodDetector;
+import com.example.yolov8detect.ml.PytorchnDetect320Float32;
 import com.example.yolov8detect.ml.WoodDetectorFP16;
 import com.example.yolov8detect.ml.WoodSSD;
 import com.example.yolov8detect.ml.WoodSSD640;
@@ -74,7 +74,7 @@ public class RuntimeHelper {
     public static OrtEnvironment env = null;
     public static Module mModule = null;
 
-    public static WoodDetector model;
+    //public static WoodDetector model;
 
     public static WoodDetectorFP16 modelFP16;
 
@@ -82,9 +82,16 @@ public class RuntimeHelper {
 
     public static WoodSSD woodSSD;
 
+    public static PytorchnDetect320Float32 model;
+
+
     private static float[] output;
 
     private static SSDResult ssdResult;
+
+    public static int benchmarkSize = 50;
+    public static long[] inference = new long[benchmarkSize];
+    public static int counter = 0;
 
     public RuntimeHelper(){
         output = new float[0];
@@ -151,11 +158,17 @@ public class RuntimeHelper {
             throw new RuntimeException(e);
         }
 
-        try (OrtSession.Result results = session.run(inputs)) {
+        try{
+
+            long startTime = System.currentTimeMillis();
+            OrtSession.Result results = session.run(inputs);
+            long endTime = System.currentTimeMillis();
+//            inference[counter] = endTime-startTime;
+//            counter++;
+
             Optional<OnnxValue> outputOnnx = results.get("output0");
             if(outputOnnx.isPresent()){
-                final OnnxTensor t = OnnxTensor.createTensor(env, outputOnnx.get().getValue());
-                outOnnx = t.getFloatBuffer().array();
+                outOnnx = OnnxTensor.createTensor(env, outputOnnx.get().getValue()).getFloatBuffer().array();
             }
         } catch (OrtException e) {
             throw new RuntimeException(e);
@@ -186,7 +199,7 @@ public class RuntimeHelper {
         try {
             Model.Options options;
             options = new Model.Options.Builder().setDevice(device).setNumThreads(4).build();
-            RuntimeHelper.model = WoodDetector.newInstance(ctx, options);
+            RuntimeHelper.model = PytorchnDetect320Float32.newInstance(ctx, options);
 
             //RuntimeHelper.modelFP16 = WoodDetectorFP16.newInstance(ctx, options);
 
@@ -222,7 +235,13 @@ public class RuntimeHelper {
         // Runs model inference and gets result.
 
         if(modelInputSize == 640){
+
+            long startTime = System.currentTimeMillis();
             WoodSSD640.Outputs outputs= RuntimeHelper.woodSSD640.process(inputFeature0);
+            long endTime = System.currentTimeMillis();
+//            inference[counter] = endTime-startTime;
+//            counter++;
+
             TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
             TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
             //TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();// TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
@@ -232,7 +251,12 @@ public class RuntimeHelper {
             return Optional.of(result);
         }
 
+        long startTime = System.currentTimeMillis();
         WoodSSD.Outputs outputs= RuntimeHelper.woodSSD.process(inputFeature0);
+        long endTime = System.currentTimeMillis();
+//        inference[counter] = endTime-startTime;
+//        counter++;
+
         TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
         TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
         //TensorBuffer outputFeature2 = outputs.getOutputFeature2AsTensorBuffer();// TensorBuffer outputFeature3 = outputs.getOutputFeature3AsTensorBuffer();
@@ -267,20 +291,29 @@ public class RuntimeHelper {
 
         TensorImage img = TensorImage.fromBitmap(bmp);
 
-        img = buildImageProcessor(size, 640, 640).process(img);
+        img = buildImageProcessor(size, 320, 320).process(img);
 
         float[] output;
         //float[] output2 = null;
 
         // Creates inputs for reference.
-        TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 640, 640, 3}, DataType.FLOAT32);
+        TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 320, 320, 3}, DataType.FLOAT32);
 
         inputFeature0.loadBuffer(img.getBuffer());
 
         //WoodDetectorFP16.Outputs outputs = RuntimeHelper.modelFP16.process(inputFeature0);
 
         // Runs model inference and gets result.
-        WoodDetector.Outputs outputs = model.process(inputFeature0);
+        //long startTime = System.currentTimeMillis();
+
+        long startTime = System.currentTimeMillis();
+        PytorchnDetect320Float32.Outputs outputs = model.process(inputFeature0);
+        long endTime = System.currentTimeMillis();
+//        inference[counter] = endTime-startTime;
+//        counter++;
+
+        //long endTime = System.currentTimeMillis();
+        //System.out.println("Inference Time Tensorflow in ms " + (endTime-startTime));
 
         TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
         //TensorBuffer outputFeature1 = outputs.getOutputFeature1AsTensorBuffer();
@@ -298,23 +331,43 @@ public class RuntimeHelper {
      *
      * @param ctx Context of the Application
      * @param assetName Name of the model inside the asset folder
-     * @param device Device.CPU or Device.VULKAN
      */
-    public static void usePyTorch(Context ctx, String assetName, Device device){
+    public static void usePyTorch(Context ctx, String assetName, int numThreads){
         try {
-            mModule = LiteModuleLoader.load(MainActivity.assetFilePath(ctx.getApplicationContext(), assetName));
-            //mModule = Module.load(MainActivity.assetFilePath(ctx, assetName), null, device);
+            PyTorchAndroid.setNumThreads(numThreads);
+            mModule = LiteModuleLoader.load(MainActivity.assetFilePath(ctx.getApplicationContext(), assetName), null, Device.CPU);
         } catch (IOException e){
 
         }
     }
 
-    public static Optional<float[]> invokePyTorch(Tensor inputTensor, int numThreads){
-        IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
-        PyTorchAndroid.setNumThreads(numThreads);
-        final Tensor outputTensor = outputTuple[0].toTensor();
-        final float[] outputs = outputTensor.getDataAsFloatArray();
-        return Optional.of(outputs);
+    public static Optional<float[]> invokePyTorchDetect(Tensor inputTensor){
+
+        IValue input = IValue.from(inputTensor);
+
+        long startTime = System.currentTimeMillis();
+        IValue out = mModule.forward(input);
+        long endTime = System.currentTimeMillis();
+
+//        inference[counter] = endTime-startTime;
+//        counter++;
+
+        return Optional.of(out.toTensor().getDataAsFloatArray());
+    }
+
+    public static Optional<float[]> invokePyTorchSegment(Tensor inputTensor){
+        IValue input = IValue.from(inputTensor);
+
+        long startTime = System.currentTimeMillis();
+        IValue out = mModule.forward(input);
+        long endTime = System.currentTimeMillis();
+
+//        inference[counter] = endTime-startTime;
+//        counter++;
+
+        IValue out0 = out.toTuple()[0];
+
+        return Optional.of(out0.toTensor().getDataAsFloatArray());
     }
 
     public static void setOutputs(float[] output){

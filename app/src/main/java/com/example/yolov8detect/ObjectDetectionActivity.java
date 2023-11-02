@@ -103,7 +103,7 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
                 break;
             case PyTorch:
                 final Tensor inputTensorOnnx = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
-                RuntimeHelper.invokePyTorch(inputTensorOnnx, 4).ifPresent(RuntimeHelper::setOutputs);
+                RuntimeHelper.invokePyTorchDetect(inputTensorOnnx).ifPresent(RuntimeHelper::setOutputs);
                 results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
             case TFLite:

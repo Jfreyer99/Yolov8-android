@@ -28,8 +28,8 @@ public class PrePostProcessor {
     static float[] NO_STD_RGB = new float[] {1.0f, 1.0f, 1.0f};
 
     // model input image size
-    static int mInputWidth = 640;
-    static int mInputHeight = 640;
+    static int mInputWidth = 320;
+    static int mInputHeight = 320;
     public static int mNmsLimit = 40;
 
     private static final int TENSOR_WIDTH = 640;
@@ -37,7 +37,9 @@ public class PrePostProcessor {
     private static final float INPUT_MEAN = 0f;
     private static final float INPUT_STANDARD_DEVIATION = 255f;
 
-    private static final int NUM_ELEMENTS = 8400;
+
+    //2100 //8400
+    private static final int NUM_ELEMENTS = 2100;
     private static final int NUM_CHANNELS = 37;
     private static final int BATCH_SIZE = 1;
     private static final int X_POINTS = 160;
@@ -140,7 +142,7 @@ public class PrePostProcessor {
 //                    maskWeight.add(outputs[c + NUM_ELEMENTS * (index + 5)]);
 //                }
 
-                Rect rect = new Rect((int)(startX+ivScaleX*x1), (int)(startY+y1*ivScaleY), (int)(startX+ivScaleX*x2), (int)(startY+ivScaleY*y2));
+                Rect rect = new Rect((int)(startX+ivScaleX*x1)*2, (int)(startY+y1*ivScaleY)*2, (int)(startX+ivScaleX*x2)*2, (int)(startY+ivScaleY*y2)*2);
                 results.add(new Result(0, cnf, rect));
                 //results.add(Output0(cx = cx, cy = cy, w = w, h = h, cnf = cnf, maskWeight = maskWeight))
             }
@@ -154,13 +156,13 @@ public class PrePostProcessor {
 
         for(int i = 0; i < NUM_ELEMENTS; i++){
 
-            float cnf = outputs[i + 8400 * 4];
+            float cnf = outputs[i + NUM_ELEMENTS * 4];
             if(cnf >= CONFIDENCE_THRESHOLD) {
 
                 float cx = outputs[i] * 640;
-                float cy = outputs[i + 8400] * 640;
-                float w = outputs[i + 8400 * 2] * 640;
-                float h = outputs[i + 8400 * 3] * 640;
+                float cy = outputs[i + NUM_ELEMENTS] * 640;
+                float w = outputs[i + NUM_ELEMENTS * 2] * 640;
+                float h = outputs[i + NUM_ELEMENTS * 3] * 640;
 
                 float x1 = cx - (w/2F);
                 float y1 = cy - (h/2F);
