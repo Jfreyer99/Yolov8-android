@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
+import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 
 public class MainActivity extends AppCompatActivity implements Runnable, AdapterView.OnItemSelectedListener {
@@ -329,11 +330,14 @@ public class MainActivity extends AppCompatActivity implements Runnable, Adapter
                 //completeTime[counter] = endTime2-startTime2;
                 break;
             case TFLite:
-                long startTime3 = System.currentTimeMillis();
-                Bitmap resizedBitmapTFLite = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
-                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmapTFLite).ifPresent(RuntimeHelper::setOutputs);
-                results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
-                long endTime3 = System.currentTimeMillis();
+                  Bitmap resizedBitmapTFLite = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+                  RuntimeHelper.invokeTensorFlowLiteRuntimeInterpreter(getApplicationContext(), resizedBitmapTFLite, "pytorchn-detect-640_float32.tflite").ifPresent(RuntimeHelper::setOutputs);
+                  results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+//                long startTime3 = System.currentTimeMillis();
+//                Bitmap resizedBitmapTFLite = Bitmap.createScaledBitmap(mBitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
+//                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmapTFLite).ifPresent(RuntimeHelper::setOutputs);
+//                results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), mImgScaleX, mImgScaleY, mIvScaleX, mIvScaleY, mStartX, mStartY);
+//                long endTime3 = System.currentTimeMillis();
                 //completeTime[counter] = endTime3-startTime3;
                 break;
             case TFLITE_SSD:

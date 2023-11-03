@@ -159,10 +159,10 @@ public class PrePostProcessor {
             float cnf = outputs[i + NUM_ELEMENTS * 4];
             if(cnf >= CONFIDENCE_THRESHOLD) {
 
-                float cx = outputs[i] * 640;
-                float cy = outputs[i + NUM_ELEMENTS] * 640;
-                float w = outputs[i + NUM_ELEMENTS * 2] * 640;
-                float h = outputs[i + NUM_ELEMENTS * 3] * 640;
+                float cx = outputs[i] * 2;
+                float cy = outputs[i + NUM_ELEMENTS] * 2;
+                float w = outputs[i + NUM_ELEMENTS * 2] * 2;
+                float h = outputs[i + NUM_ELEMENTS * 3] * 2;
 
                 float x1 = cx - (w/2F);
                 float y1 = cy - (h/2F);

@@ -97,17 +97,17 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
 
         switch(RuntimeHelper.currentRuntime){
             case Onnx:
-                final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
-                RuntimeHelper.invokeOnnxRuntime(inputTensor).ifPresent(RuntimeHelper::setOutputs);
+                final Tensor inputTensorOnnx = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+                RuntimeHelper.invokeOnnxRuntime(inputTensorOnnx).ifPresent(RuntimeHelper::setOutputs);
                 results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
             case PyTorch:
-                final Tensor inputTensorOnnx = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
-                RuntimeHelper.invokePyTorchDetect(inputTensorOnnx).ifPresent(RuntimeHelper::setOutputs);
+                final Tensor inputTensorPyTorch = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
+                RuntimeHelper.invokePyTorchDetect(inputTensorPyTorch).ifPresent(RuntimeHelper::setOutputs);
                 results =  PrePostProcessor.outputsToNMSPredictions(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
             case TFLite:
-                RuntimeHelper.invokeTensorFlowLiteRuntime(resizedBitmap).ifPresent(RuntimeHelper::setOutputs);
+                RuntimeHelper.invokeTensorFlowLiteRuntimeInterpreter(getApplicationContext(), resizedBitmap, "pytorchn-detect-640_float32.tflite").ifPresent(RuntimeHelper::setOutputs);
                 results = PrePostProcessor.outputsToNMSPredictionsTFLITE(RuntimeHelper.getOutput(), imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
                 break;
             case TFLITE_SSD:

@@ -2,6 +2,7 @@ package com.example.yolov8detect;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.os.Build;
 
 import com.example.yolov8detect.ml.PytorchnDetect320Float32;
 import com.example.yolov8detect.ml.WoodDetectorFP16;
@@ -18,6 +19,8 @@ import org.pytorch.PyTorchAndroid;
 import org.pytorch.Tensor;
 
 import org.tensorflow.lite.DataType;
+import org.tensorflow.lite.Interpreter;
+import org.tensorflow.lite.TensorFlowLite;
 import org.tensorflow.lite.support.common.ops.NormalizeOp;
 import org.tensorflow.lite.support.image.ImageProcessor;
 import org.tensorflow.lite.support.image.TensorImage;
@@ -26,13 +29,19 @@ import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp;
 import org.tensorflow.lite.support.model.Model;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import ai.onnxruntime.OnnxJavaType;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OnnxValue;
 import ai.onnxruntime.OrtEnvironment;
@@ -83,6 +92,8 @@ public class RuntimeHelper {
     public static WoodSSD woodSSD;
 
     public static PytorchnDetect320Float32 model;
+
+    public static Interpreter interpreter;
 
 
     private static float[] output;
@@ -149,7 +160,6 @@ public class RuntimeHelper {
      */
     public static Optional<float[]> invokeOnnxRuntime(Tensor inputTensor){
         //ONNX-Runtime
-        float[] outOnnx = null;
 
         Map<String, OnnxTensor> inputs = new HashMap<>();
         try {
@@ -168,12 +178,12 @@ public class RuntimeHelper {
 
             Optional<OnnxValue> outputOnnx = results.get("output0");
             if(outputOnnx.isPresent()){
-                outOnnx = OnnxTensor.createTensor(env, outputOnnx.get().getValue()).getFloatBuffer().array();
+                return Optional.of(OnnxTensor.createTensor(env, outputOnnx.get().getValue()).getFloatBuffer().array());
             }
         } catch (OrtException e) {
             throw new RuntimeException(e);
         }
-        return Optional.of(outOnnx);
+        return Optional.of(null);
     }
 
 
@@ -325,6 +335,33 @@ public class RuntimeHelper {
         //this.model.close();
 
         return Optional.of(output);
+    }
+
+
+    public static Optional<float[]> invokeTensorFlowLiteRuntimeInterpreter(Context ctx, Bitmap bmp, String assetName) {
+
+        File model = null;
+        try {
+            model = new File(MainActivity.assetFilePath(ctx.getApplicationContext(), assetName));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        try(Interpreter interpreter = new Interpreter(model)) {
+            int width = bmp.getWidth();
+            int height = bmp.getHeight();
+            int size = Math.min(height, width);
+
+            TensorImage img = TensorImage.fromBitmap(bmp);
+
+            img = buildImageProcessor(size, 320, 320).process(img);
+
+            TensorBuffer output = TensorBuffer.createFixedSize(new int[]{1, 5, 2100}, DataType.FLOAT32);
+
+            interpreter.run(img.getBuffer(), output.getBuffer());
+
+            return Optional.of(output.getFloatArray());
+        }
     }
 
     /**
